@@ -2,6 +2,17 @@ clear
 close
 clc
 
+%% Proprietes physiques
+pourc_C = 87.4; % en %
+pourc_H = 12.6; % en %
+MM = 148.6;    % en g/mol
+MM_C = 12;
+MM_H = 1;
+x = (pourc_C/100)*MM/MM_C;
+y = (pourc_H/100)*MM/MM_H;
+
+
+
 %% Excel
 cp_a = @(Temp) 0.202*Temp + 944.9;
 cv_a = @(Temp) 0.202*Temp + 656.59;
@@ -99,9 +110,9 @@ m3p = p3p*10^5*V_max/r3p/T3p;
 % compression poly 3' - 4
 % pv^n = cste
 
-points = csvread('points.csv');
-pBas = csvread('PV_bas.csv'); V_bas = pBas(:,1); p_bas = pBas(:,2);
-pHaut = csvread('PV_haut.csv'); V_haut = pHaut(:,1); p_haut = pHaut(:,2);
+points = csvread('Tables\points.csv');
+pBas = csvread('Tables\PV_bas.csv'); V_bas = pBas(:,1); p_bas = pBas(:,2);
+pHaut = csvread('Tables\PV_haut.csv'); V_haut = pHaut(:,1); p_haut = pHaut(:,2);
 
 n_comp = 1.34; % Excel
 p(4) = p3p*taux_comp^n_comp;
@@ -493,9 +504,11 @@ n_icycle = abs(W_th)/Qcalo;
 % prevoir les oxydes
 % vitesse de formation des oxydes
 
-% A partir du PCI
-qp = phi*PCI*1000/(phi+psi_s);
-T5 = Tn(4) + qp/cp_p(Tn(4));  
+phi1=1; % le melange air/carburant est a richesse 1 (meme pour diesel)
+
+%% a) A partir du PCI
+qp = phi1*PCI*1000/(phi1+psi_s);
+T5a = Tn(4) + qp/cp_p(Tn(4));
 
 DT = 100;
 tol = 1;                %DT = 1K
@@ -503,19 +516,49 @@ i = 0;
 
 while (DT > tol && i < 10000)
    i = i+1;
-   T5_old = T5;
-   Tmoy = 0.5*(Tn(4)+T5);
-   T5 = Tn(4) + qp/cp_p(Tmoy);
-   DT = abs(T5-T5_old);
+   Tmoy = 0.5*(Tn(4)+T5a);
+   T5a = Tn(4) + qp/cp_p(Tmoy);
+   DT = abs(T5a-2*Tmoy+Tn(4));
 end
 
 
-% A partir de la chaleur de reaction
+%% A partir de la chaleur de reaction
+tCxHy = csvread('Tables\CxHy_Tables.csv');
+tO2 = csvread('Tables\O2_Tables.csv');
+tN2 = csvread('Tables\N2_Tables.csv');
+tH2O = csvread('Tables\H2O_Tables.csv');
+tCO2 = csvread('Tables\CO2_Tables.csv');
 
+% combustion
+    % reactifs
+H_C  = 1*interp_data(tCxHy,Tn(4),1,2);
+H_O2 = (x+y/4)*interp_data(tO2,Tn(4),1,3);
+H_N2 = (x+y/4)*3.76*interp_data(tN2,Tn(4),1,3);
+    % produits
+H_CO2  = x*interp_data(tCO2,Tn(4),1,3);
+H_H2O  = y/2*interp_data(tH2O,Tn(4),1,3);
+H_N2_2 = (x+y/4)*3.76*interp_data(tN2,Tn(4),1,3);
+H_produits = (H_CO2+H_H2O+H_N2_2);
+H_reactifs = (H_C+H_O2+H_N2);
+H1 = H_produits - H_reactifs; H1 = abs(H1);
 
+DH = 1000;
+tol = 1/100;
+i = 0;
+T5b = Tn(4)+50;
 
+while (DH > tol && i < 10^4)
+   i = i+1;
+   % echauffement % Hs(T5)-Hs(T4)
+   H_CO2 = x*(interp_data(tCO2,T5b,1,2)-interp_data(tCO2,Tn(4),1,2));
+   H_H2O = y/2*(interp_data(tH2O,T5b,1,2)-interp_data(tH2O,Tn(4),1,2));
+   H_N2_2 = (x+y/4)*3.76*(interp_data(tN2,T5b,1,2)-interp_data(tN2,Tn(4),1,2));
+   H2 = H_CO2+H_H2O+H_N2_2;
+   DH = abs(H1-H2)/H1;
+   T5b = T5b+50;
+end
 
-
+DT_ver = abs(T5a-T5b);
 
 %% Plot
 % Vplot = [V_max; V_min; V_min; V4pp; Vn(5); V_max; V_max];
