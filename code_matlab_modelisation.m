@@ -134,8 +134,14 @@ T4pp = p4pp*10^5 * V4pp / m4p / r4p;
 
 %% 5
 
-p(5)=60; %courbe
-V(5)= 3.34*V_min;
+%p(5)=60; %courbe
+%V(5)= 3.34*V_min;
+% p(5) = 63;
+% V(5) = 3.3*V_min;
+tol = 1/100;
+[p(5),V(5),indices] = trouver_isotherme(p_haut, V_haut, p4pp, V4pp/V_min, tol);
+V(5) = V(5) * V_min;
+
 T(5) = p(5)*10^5*V(5)/m3p/rp;
 %V52 = m3p*rp*T(5)/p(5)/10^5;
 DT_45 = abs(T(5)-T4pp)/T4pp*100;
@@ -523,21 +529,27 @@ end
 
 
 %% A partir de la chaleur de reaction
+% Les colonnes
+% T	 Cp	 s_l	h_l 	h_s	 Dh_f	 DG_f	 logKp
 tCxHy = csvread('Tables\CxHy_Tables.csv');
 tO2 = csvread('Tables\O2_Tables.csv');
 tN2 = csvread('Tables\N2_Tables.csv');
 tH2O = csvread('Tables\H2O_Tables.csv');
 tCO2 = csvread('Tables\CO2_Tables.csv');
 
+col  = 6;   % Dh_f
+col2 = 5;   % h_s
+
 % combustion
     % reactifs
 H_C  = 1*interp_data(tCxHy,Tn(4),1,2);
-H_O2 = (x+y/4)*interp_data(tO2,Tn(4),1,3);
-H_N2 = (x+y/4)*3.76*interp_data(tN2,Tn(4),1,3);
+H_O2 = (x+y/4)*interp_data(tO2,Tn(4),1,col);
+H_N2 = (x+y/4)*3.76*interp_data(tN2,Tn(4),1,col);
     % produits
-H_CO2  = x*interp_data(tCO2,Tn(4),1,3);
-H_H2O  = y/2*interp_data(tH2O,Tn(4),1,3);
-H_N2_2 = (x+y/4)*3.76*interp_data(tN2,Tn(4),1,3);
+H_CO2  = x*interp_data(tCO2,Tn(4),1,col);
+H_H2O  = y/2*interp_data(tH2O,Tn(4),1,col);
+H_N2_2 = (x+y/4)*3.76*interp_data(tN2,Tn(4),1,col);
+
 H_produits = (H_CO2+H_H2O+H_N2_2);
 H_reactifs = (H_C+H_O2+H_N2);
 H1 = H_produits - H_reactifs; H1 = abs(H1);
@@ -550,9 +562,9 @@ T5b = Tn(4)+50;
 while (DH > tol && i < 10^4)
    i = i+1;
    % echauffement % Hs(T5)-Hs(T4)
-   H_CO2 = x*(interp_data(tCO2,T5b,1,2)-interp_data(tCO2,Tn(4),1,2));
-   H_H2O = y/2*(interp_data(tH2O,T5b,1,2)-interp_data(tH2O,Tn(4),1,2));
-   H_N2_2 = (x+y/4)*3.76*(interp_data(tN2,T5b,1,2)-interp_data(tN2,Tn(4),1,2));
+   H_CO2 = x*(interp_data(tCO2,T5b,1,col2)-interp_data(tCO2,Tn(4),1,col2));
+   H_H2O = y/2*(interp_data(tH2O,T5b,1,col2)-interp_data(tH2O,Tn(4),1,col2));
+   H_N2_2 = (x+y/4)*3.76*(interp_data(tN2,T5b,1,col2)-interp_data(tN2,Tn(4),1,col2));
    H2 = H_CO2+H_H2O+H_N2_2;
    DH = abs(H1-H2)/H1;
    T5b = T5b+50;
@@ -561,11 +573,15 @@ end
 DT_ver = abs(T5a-T5b);
 
 %% Plot
-% Vplot = [V_max; V_min; V_min; V4pp; Vn(5); V_max; V_max];
-% pplot = [p3p; pn(4); p4p; p4pp; pn(5); pn(6); p3p];
+Vplot = [V_max/V_min;   1;      1;      V4pp/V_min;    Vn(5)/V_min;    V_max/V_min;     V_max/V_min];
+pplot = [p3p;           pn(4);  p4p;    p4pp;          pn(5);          pn(6);           p3p];
 
 
-% loglog(V_bas*V_min,p_bas,V_haut*V_min,p_haut, Vplot, pplot, '*')
-% loglog(Vplot,pplot, '*')
-
+loglog(Vplot, pplot,'*-black',V_bas,p_bas,'blue',V_haut,p_haut,'blue','LineWidth',2)
+%plot(V_bas,p_bas,'blue',V_haut,p_haut,'blue',Vplot, pplot,'black*','LineWidth',2)
+title('Cycle Thermodynamique (Reel vs Enveloppe)','fontweight','bold')
+xlabel('V/V_0','fontweight','bold')
+ylabel('Pression (bar)','fontweight','bold')
+legend('Enveloppe')
+grid()
 
