@@ -1,8 +1,12 @@
+MOT3_Proprietes_Gaz
 clear
 close
 clc
 
-%% Proprietes physiques
+%% Proprietes gaz
+
+load('proprietes_gaz.mat')
+
 pourc_C = 87.4; % en %
 pourc_H = 12.6; % en %
 MM = 148.6;    % en g/mol
