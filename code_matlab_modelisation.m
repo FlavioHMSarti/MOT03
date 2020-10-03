@@ -1,44 +1,13 @@
 MOT3_Proprietes_Gaz
-clear
-close
-clc
 
 %% Proprietes gaz
 
-load('proprietes_gaz.mat')
+load('input_variables/proprietes_gaz.mat')
 
-pourc_C = 87.4; % en %
-pourc_H = 12.6; % en %
-MM = 148.6;    % en g/mol
-MM_C = 12;
-MM_H = 1;
-x = (pourc_C/100)*MM/MM_C;
-y = (pourc_H/100)*MM/MM_H;
-
-
-
-%% Excel
-cp_a = @(Temp) 0.202*Temp + 944.9;
-cv_a = @(Temp) 0.202*Temp + 656.59;
-gamma_a = @(Temp) -9/10^5*Temp + 1.4284;
-ra = 288.2801664;
-
-cp_f = @(Temp) 0.3255*Temp + 935.96;
-cv_f = @(Temp) 0.3255*Temp + 658.51;
-gamma_f = @(Temp) -1/10^4*Temp + 1.4006;
-rf = 277.4513479;
-
-cp_p = @(Temp) -6/10^5*Temp^2 + 0.3304*Temp + 950.81;
-cv_p = @(Temp) -6/10^5*Temp^2 + 0.3304*Temp + 663.76;
-gamma_p = @(Temp) 2/10^8*Temp^2 - 0.0001*Temp + 1.4104;
-rp = 287.0473442;
-
-PCI = 42722.66063; % kJ/kg
-phi = 0.7;
-psi_s = 14.32288;
-
-
-
+% Rapport
+Ntot = 13;
+saveVar = zeros(Ntot,1);
+saveVar(1) = PCI;
 
 %% Hyp
 T = zeros(1,8); p = T; V = T;
@@ -47,26 +16,23 @@ p_atm = 1;
 Tref = 50+273.15;              % on a l'air
 COF = 0.8;
 Dp_ech = 10/1000;
-
-% F = phi/psi_s
 F = phi/psi_s;
 
 %% Moteur
 
-D = 79.5/1000;
-C = 80.5/1000;
-taux_comp = 21.8; % moteur 4b
-
-n_compresseur = 0.8;
-pi_comp = 1.8;
-n_turb = 0.8;
-pi_turb = 1.4; 
-
-n_meca = 0.875;
-n_comb = 0.98;
-
-Ncyl = 4;
-N = 3700; %rpm
+moteur = readtable('input_variables/moteur_spec.csv');
+moteur = table2array(moteur(:,2));
+D = moteur(1);
+C = moteur(2);
+taux_comp = moteur(3);
+n_compresseur = moteur(4);
+pi_comp = moteur(5);
+n_turb = moteur(6);
+pi_turb = moteur(7); 
+n_meca = moteur(8);
+n_comb = moteur(9);
+Ncyl = moteur(10);
+N = moteur(11);
 
 %% Point 2
 
@@ -118,7 +84,9 @@ points = csvread('Tables\points.csv');
 pBas = csvread('Tables\PV_bas.csv'); V_bas = pBas(:,1); p_bas = pBas(:,2);
 pHaut = csvread('Tables\PV_haut.csv'); V_haut = pHaut(:,1); p_haut = pHaut(:,2);
 
-n_comp = 1.34; % Excel
+%n_comp = 1.34; % Excel
+n_comp = polytropique(p_bas,V_bas,p3p);
+saveVar(2) = n_comp;
 p(4) = p3p*taux_comp^n_comp;
 T(4) = p(4)*10^5*V_min/m3p/ra;
 V(4) = V_min;
@@ -131,17 +99,11 @@ T4p = p4p*10^5 * V_min / m4p / r4p;
 
 %% 4''
 p4pp = p4p;
-%[max_p,indice] = max(p_cycle);
-%V4pp = V_cycle(indice);
 V4pp = 1.22*V_min;
 T4pp = p4pp*10^5 * V4pp / m4p / r4p;
 
 %% 5
 
-%p(5)=60; %courbe
-%V(5)= 3.34*V_min;
-% p(5) = 63;
-% V(5) = 3.3*V_min;
 tol = 1/100;
 [p(5),V(5),indices] = trouver_isotherme(p_haut, V_haut, p4pp, V4pp/V_min, tol);
 V(5) = V(5) * V_min;
@@ -149,16 +111,18 @@ V(5) = V(5) * V_min;
 T(5) = p(5)*10^5*V(5)/m3p/rp;
 %V52 = m3p*rp*T(5)/p(5)/10^5;
 DT_45 = abs(T(5)-T4pp)/T4pp*100;
+saveVar(3) = DT_45;
 
 %% 6
-n_det = 1.2024; %Excel
+%n_det = 1.2024; %Excel
+n_det = polytropique(p_haut,V_haut,p(5));
+saveVar(4) = n_det;
 p(6) = p(5)*(V(5)/V_max)^n_det;
 T(6) = p(6)*10^5*V_max/m3p/rp;
 V(6) = m3p*rp*T(6)/p(6)/10^5;
 
 %% 7
 
-DP = abs(6.57964743021319-p(6))/p(6)*100;
 p(7) = pi_turb * p_atm;
 
 DT = 100;
@@ -219,7 +183,7 @@ while (DT > tol && j < 10^3)
     m3pn = p3p*10^5*V_max/r3p/T3p;
     f = p(7)*10^5*V_min/m3pn/rp/T(7);
 end
-
+saveVar(5) = f;
 
 %% 3' - 4
 Tn = zeros(1,8); pn = Tn; Vn = Tn;
@@ -251,7 +215,6 @@ Qt = m3pn * rp * Tn(5) * log(V(5)/V4pp);
 Qapp = Qv+Qp+Qt;
 
 %fraction de gaz brules
-%xbi = Qi/Qapp
 xv = Qv/Qapp;
 xp = (Qv+Qp)/Qapp;
 
@@ -294,7 +257,6 @@ Qappn = Qv+Qp+Qt;
 
 %% 5-6
 Tn(6) = p(6)*10^5*V(6)/m5n/rp;
-%faire la transformation ou pas
 
 %% 6 - 7
 
@@ -313,53 +275,9 @@ while (DT > tol && i < 10000)
    DT = abs(Tn(7) - 2*Tmoy + Tn(6));
 end
 
-
-% %% 7' (2) pas besoin?
-% 
-% DT = 100;
-% tol = 1;               
-% i = 0;
-% gamma = gamma_p(Tn(7));
-% T7pn = Tn(7)*(p(7)/p7p)^((1-gamma)/gamma);
-% 
-% while (DT > tol && i < 10000)
-%    Tmoy = (Tn(7) + T7pn)/2;
-%    gamma = gamma_p(Tmoy);
-%    T7pn = Tn(7)*(p(7)/p7p)^((1-gamma)/gamma);
-%    i = i+1;
-%    DT = abs(Tn(7) - 2*Tmoy + T7pn);
-% end
-% %% Boucle T3pn pas besoin?
-% 
-% %on a f deja
-% tol = 1; % 1K
-% j = 0;
-% 
-% r3p = f*rp+(1-f)*ra; % Diesel
-% T0 = 273.15;
-% DT = 100;
-% T3p_old = T3pn;
-% fn = f;
-% 
-% 
-% while (DT > tol && j < 10^3)
-%     j=j+1;
-%     T03 = (T0+T3pn)/2;
-%     T07 = (T0+T7pn)/2;
-%     cp_03 = fn*cp_p(T03)+(1-fn)*cp_a(T03);
-%     T3pn = (fn*cp_p(T07)*(T7pn-T0)+(1-fn)*cp_a(T03)*(T(3)-T0))/cp_03+T0;
-%     DT = abs(T3pn-T3p_old);
-%     T3p_old = T3pn;
-%     m3pn = p3p*10^5*V_max/r3p/T3pn;
-%     fn = p(7)*10^5*V_min/m3pn/rp/Tn(7);
-% end
-% Df = abs(fn-f)/f*100;
-
 Tn(Tn==0)=T(Tn==0);
 pn(pn==0)=p(pn==0);
 Vn(Vn==0)=V(Vn==0);
-% Tn=Tn'; pn=pn'; Vn=Vn';
-% T=T'; p=p'; V=V';
 
 %% 7 - 8
 tol_q = 15/100; %qwaste/qturb
@@ -406,12 +324,13 @@ qcarb = m3p*(1-f)*F*N/120*Ncyl;
 rapport_q_old = qwaste/qturb;
 qwaste = qcomp+qcarb-qturb;
 
-
 j = j+1;
 
 end
 
-Dq = (qwaste)/(qcomp+qcarb+qturb+qwaste)*100;
+saveVar(6) = pi_turbn;
+Dq = abs(qwaste)/(qcomp+qcarb+qturb+qwaste)*100;
+saveVar(7) = Dq;
 
 %% 7 - 8'
 p8p = p_atm;
@@ -420,6 +339,7 @@ T8p = Tn(7);
 %% 8' - 9
 qmoteur = qwaste + qturb;
 Tn(9) = qwaste/qmoteur*T8p + qturb/qmoteur*Tn(8);
+pn(9) = p_atm;
 
 %% Calcul des travaux
 r3p = (1-f)*ra+f*rp;
@@ -445,16 +365,37 @@ Qapp = Qv+Qp+Qt;
 Tmoy = 0.5*(Tn(2)+Tn(3));
 m_air = qcomp / (N/120 * Ncyl);
 Q23 = m_air * cp_a(Tmoy) * (Tn(3)-Tn(2)); % < 0
+if (Q23 <0) 
+    saveVar(8) = 1; 
+else
+    saveVar(8) = 0; 
+end
 
 Tmoy = 0.5*(T3pn+Tn(4));
 cv = f*cv_p(Tmoy)+(1-f)*cv_a(Tmoy);
 gamma = f*gamma_p(Tmoy)+(1-f)*gamma_a(Tmoy);
 Q3p4 = m3pn*cv*(Tn(4)-T3pn)-W3p4; % si n_comp = 1.34 < gamma = 1.37, Q < 0
 
+if (n_comp < gamma && Q3p4 <0) 
+    saveVar(9) = 1; 
+elseif (n_comp > gamma && Q3p4 > 0) 
+    saveVar(9) = 1; 
+else
+    saveVar(9) = 0;
+end
+
 Tmoy = 0.5*(Tn(5)+Tn(6));
 cv = f*cv_p(Tmoy)+(1-f)*cv_a(Tmoy);
 gamma = f*gamma_p(Tmoy)+(1-f)*gamma_a(Tmoy);
 Q56 = m3pn*cv*(Tn(6)-Tn(5))-W56; % si n_det < gamma, Q > 0
+
+if (n_det < gamma && Q56 >0) 
+    saveVar(10) = 1; 
+elseif (n_det > gamma && Q56 < 0) 
+    saveVar(10) = 1; 
+else
+    saveVar(10) = 0;
+end
 
 Q_pertes_comb = Qcomb-Qcalo; % < 0
 Q_pertes_paroi = Qapp - Qcomb; % <0
@@ -484,13 +425,17 @@ else
     labels = {'Q23', 'Q frottements'};
 end
 
-% pie(abs(X))
-% legend(labels,'Location','southeast')
-
+if (opt_plot_1)
+    figure()
+    pie(abs(X))
+    legend(labels,'Location','southeast')
+    title('Repartition de l energie degagee par la combustion')
+end
 
 % discuter comment diminuer les pertes
 
 DQ = (Qcalo-abs(Pertes_moteur+Q_echap+Pertes_turbo+W_th))/Qcalo*100;
+saveVar(11) = DQ;
 
 %% Performances
 
@@ -502,13 +447,7 @@ CSI = qcarb/Pi;
 CSI_g = CSI*(1000*3600*1000);
 n_icycle = abs(W_th)/Qcalo;
 
-% 
-% n_th = -W_th / Qcomb;
-% n_cycle = W_i / W_th;
-% n_m = W_e / W_i; %mecanique de l'ensemble
-% n_i = n_comb * n_th * n_cycle;
-% n_eff = n_i * n_m;
-
+saveVar(12) = n_icycle;
 
 %% Temperature adiabatique de flamme 
 % prevoir les oxydes
@@ -535,11 +474,6 @@ end
 %% A partir de la chaleur de reaction
 % Les colonnes
 % T	 Cp	 s_l	h_l 	h_s	 Dh_f	 DG_f	 logKp
-tCxHy = csvread('Tables\CxHy_Tables.csv');
-tO2 = csvread('Tables\O2_Tables.csv');
-tN2 = csvread('Tables\N2_Tables.csv');
-tH2O = csvread('Tables\H2O_Tables.csv');
-tCO2 = csvread('Tables\CO2_Tables.csv');
 
 col  = 6;   % Dh_f
 col2 = 5;   % h_s
@@ -575,17 +509,42 @@ while (DH > tol && i < 10^4)
 end
 
 DT_ver = abs(T5a-T5b);
+saveVar(13)=DT_ver;
 
 %% Plot
-Vplot = [V_max/V_min;   1;      1;      V4pp/V_min;    Vn(5)/V_min;    V_max/V_min;     V_max/V_min];
-pplot = [p3p;           pn(4);  p4p;    p4pp;          pn(5);          pn(6);           p3p];
+if(opt_plot_2)
+    figure()
+    Vplot = [V_max/V_min;   1;      1;      V4pp/V_min;    Vn(5)/V_min;    V_max/V_min;     V_max/V_min];
+    pplot = [p3p;           pn(4);  p4p;    p4pp;          pn(5);          pn(6);           p3p];
+    plot(V_bas,p_bas,'blue',V_haut,p_haut,'blue',Vplot, pplot,'black*','LineWidth',2)
+    title('Cycle Thermodynamique (Reel vs Enveloppe)','fontweight','bold')
+    xlabel('V/V_0','fontweight','bold')
+    ylabel('Pression (bar)','fontweight','bold')
+    legend('Enveloppe')
+    grid()
+end
+
+if(opt_plot_3)
+    figure()
+    Vplot = [V_max/V_min;   1;      1;      V4pp/V_min;    Vn(5)/V_min;    V_max/V_min;     V_max/V_min];
+    pplot = [p3p;           pn(4);  p4p;    p4pp;          pn(5);          pn(6);           p3p];
+    loglog(Vplot, pplot,'*-black',V_bas,p_bas,'blue',V_haut,p_haut,'blue','LineWidth',2)
+    title('Cycle Thermodynamique (Reel vs Enveloppe)','fontweight','bold')
+    xlabel('V/V_0','fontweight','bold')
+    ylabel('Pression (bar)','fontweight','bold')
+    legend('Enveloppe')
+    grid()
+end
 
 
-loglog(Vplot, pplot,'*-black',V_bas,p_bas,'blue',V_haut,p_haut,'blue','LineWidth',2)
-%plot(V_bas,p_bas,'blue',V_haut,p_haut,'blue',Vplot, pplot,'black*','LineWidth',2)
-title('Cycle Thermodynamique (Reel vs Enveloppe)','fontweight','bold')
-xlabel('V/V_0','fontweight','bold')
-ylabel('Pression (bar)','fontweight','bold')
-legend('Enveloppe')
-grid()
+%% Rapport des r?sultats
+namesVar = ["PCI";"n_comp";"DT_45";"n_det";"f";"pi_turbn";"Dq";"Q23=1";...
+    "Q3p4=1";"Q56=1";"DQ";"nicycle";"DT_ver"];
+T1 = table(namesVar,saveVar);
+T2 = table([pn';p3p;p4p;p4pp;p7p;p8p],[Tn';T3p;T4p;T4pp;T7p;T8p]);
+T1.Properties.VariableNames = {'Variable', 'Value'};
+T2.Properties.VariableNames = {'p_bar', 'T_K'};
+mkdir('output_variables')
+write(T1,'output_variables/rapport.csv','Delimiter',',')
+write(T2,'output_variables/rapport_pT.csv','Delimiter',',')
 
