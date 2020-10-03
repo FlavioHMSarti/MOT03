@@ -1,0 +1,11 @@
+D,0.0795, m
+C,0.0805, m
+taux_comp,21.80, -
+n_compresseur,0.80, - 
+pi_comp,1.80, -
+n_turb,0.80,-
+pi_turb,1.40, -
+n_meca,0.875, -
+n_comb,0.98, -
+N_cyl,4.00, -
+N,3700.00, rpm
