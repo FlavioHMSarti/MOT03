@@ -1,4 +1,4 @@
-MOT3_Proprietes_Gaz
+proprietes_gaz
 
 %% Proprietes gaz
 
