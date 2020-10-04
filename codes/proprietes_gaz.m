@@ -9,7 +9,7 @@ R = 8.314;                       % J/mol-K
 
 % carburant
 
-carburant = readtable('input_variables/carburant_spec.csv');
+carburant = readtable('input_variables/carburant_spec.csv','HeaderLines',1);
 carburant = table2array(carburant(:,2));
 
 pMasse_C = carburant(1)/100;         % "%"

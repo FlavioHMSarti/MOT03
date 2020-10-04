@@ -13,12 +13,16 @@ function [p5,V5,indices] = trouver_isotherme(vecteur_p, vecteur_V, p4pp, V4pp, t
 % indices -> indices representant la isotherme dans le vecteur_V
 
 if (nargin < 5 && nargin >= 4)
-    tol = 1/100; % 1% valeur par defaut
+    tol = 0/100; % 1% valeur par defaut
 end
 
-C = p4pp * V4pp; % isotherme, alors p*V = cte = C
+indices = 0;
 
-indices = abs(1-vecteur_p.*vecteur_V./C) < tol;
+while (sum(indices) == 0)
+    C = p4pp * V4pp; % isotherme, alors p*V = cte = C
+    indices = abs(1-vecteur_p.*vecteur_V./C) < tol;
+    tol = tol + 1/100;
+end
 p5 = vecteur_p(indices); V5 = vecteur_V(indices);
 p5 = ceil(p5(end));
 V5 = V5(end)*(1+tol);

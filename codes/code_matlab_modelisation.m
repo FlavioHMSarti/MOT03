@@ -20,7 +20,7 @@ F = phi/psi_s;
 
 %% Moteur
 
-moteur = readtable('input_variables/moteur_spec.csv');
+moteur = readtable('input_variables/moteur_spec.csv','HeaderLines',1);
 moteur = table2array(moteur(:,2));
 D = moteur(1);
 C = moteur(2);
@@ -72,6 +72,13 @@ V_min = Cu/(taux_comp-1);
 % Point 3? : Les gaz r?siduels et les gaz frais sont m?lang?s ? la
 % pression P3?. On calcule d'abord 3' sans gaz r?siduel et on le
 % modifie apr?s dans une boucle
+
+pBas = csvread('input_variables\PV_bas.csv',1); V_bas = pBas(:,1); p_bas = pBas(:,2);
+pHaut = csvread('input_variables\PV_haut.csv',1); V_haut = pHaut(:,1); p_haut = pHaut(:,2);
+
+% [~,i] = max(V_bas);
+% p3p = p_bas(i);
+
 T3p = T(3);
 p3p = p(3); % pas de perte de charge apres le soupape
 m3p = p3p*10^5*V_max/r3p/T3p;
@@ -80,11 +87,6 @@ m3p = p3p*10^5*V_max/r3p/T3p;
 % compression poly 3' - 4
 % pv^n = cste
 
-points = csvread('Tables\points.csv');
-pBas = csvread('Tables\PV_bas.csv'); V_bas = pBas(:,1); p_bas = pBas(:,2);
-pHaut = csvread('Tables\PV_haut.csv'); V_haut = pHaut(:,1); p_haut = pHaut(:,2);
-
-%n_comp = 1.34; % Excel
 n_comp = polytropique(p_bas,V_bas,p3p);
 saveVar(2) = n_comp;
 p(4) = p3p*taux_comp^n_comp;
@@ -104,8 +106,7 @@ T4pp = p4pp*10^5 * V4pp / m4p / r4p;
 
 %% 5
 
-tol = 1/100;
-[p(5),V(5),indices] = trouver_isotherme(p_haut, V_haut, p4pp, V4pp/V_min, tol);
+[p(5),V(5),indices] = trouver_isotherme(p_haut, V_haut, p4pp, V4pp/V_min);
 V(5) = V(5) * V_min;
 
 T(5) = p(5)*10^5*V(5)/m3p/rp;
@@ -114,7 +115,6 @@ DT_45 = abs(T(5)-T4pp)/T4pp*100;
 saveVar(3) = DT_45;
 
 %% 6
-%n_det = 1.2024; %Excel
 n_det = polytropique(p_haut,V_haut,p(5));
 saveVar(4) = n_det;
 p(6) = p(5)*(V(5)/V_max)^n_det;
@@ -294,20 +294,20 @@ while(qwaste/qturb > tol_q  && j < 10^5)
         pi_turbn = pi_turb*(1+0.1);
     end
 
-p(8) = p(7)/pi_turbn;
+pn(8) = pn(7)/pi_turbn;
 
 DT = 100;
 tol = 1;                %DT = 1K
 i = 0;
 
 gamma = gamma_p(Tn(7));
-T8_is = Tn(7)*(p(8)/p(7))^((gamma-1)/gamma); 
+T8_is = Tn(7)*(pn(8)/p(7))^((gamma-1)/gamma); 
 
 while (DT > tol && i < 10000)
    i = i+1;
    Tmoy = (T8_is + Tn(7))/2;  
    gamma = gamma_p(Tmoy); 
-   T8_is = Tn(7)*(p(8)/p(7))^((gamma-1)/gamma); 
+   T8_is = Tn(7)*(pn(8)/p(7))^((gamma-1)/gamma); 
    DT = abs(T8_is - 2*Tmoy + Tn(7));
 end
 Tn(8) = Tn(7) + (T8_is-Tn(7))/n_turb;
