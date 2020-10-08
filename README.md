@@ -18,7 +18,7 @@ fichiers .csv et collez-les dans le dossier "input_variables".**
 Dossier vide qui recevra les valeurs du dossier "info_moteurs".
 
 ## fichier "tables"
-Contient les tables thermodynamiques attachées à l'extrémité du poly
+Contient les tables thermodynamiques attachées aux annexes du poly
 
 ## archive "fonction.principale.m"
 Fonction principale à lancer dans matlab. Il se chargera d'appeler toutes les autres fonctions / scripts seul et créera le dossier output_variables avec
