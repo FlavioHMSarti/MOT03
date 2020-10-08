@@ -10,3 +10,8 @@ n_meca,0.875, -
 n_comb,0.98, -
 N_cyl,4.00, -
 N,2250.00, rpm
+T_capot, 50, oC
+T_ref_ech, 50, oC
+p_atm, 1, bar
+COF_ech, 0.8, -
+Dp_ech, 10, mbar
