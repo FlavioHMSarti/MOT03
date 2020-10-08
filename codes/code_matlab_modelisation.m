@@ -3,25 +3,20 @@ proprietes_gaz
 %% Proprietes gaz
 
 load('input_variables/proprietes_gaz.mat')
+F = phi/psi_s;
+
 
 % Rapport
-Ntot = 13;
-saveVar = zeros(Ntot,1);
-saveVar(1) = PCI;
 
-%% Hyp
-T = zeros(1,8); p = T; V = T;
 
-p_atm = 1;
-Tref = 50+273.15;              % on a l'air
-COF = 0.8;
-Dp_ech = 10/1000;
-F = phi/psi_s;
 
 %% Moteur
 
+T = zeros(1,8); p = T; V = T;
+
 moteur = readtable('input_variables/moteur_spec.csv','HeaderLines',1);
 moteur = table2array(moteur(:,2));
+
 D = moteur(1);
 C = moteur(2);
 taux_comp = moteur(3);
@@ -34,9 +29,17 @@ n_comb = moteur(9);
 Ncyl = moteur(10);
 N = moteur(11);
 
+T_capot = moteur(12) + 273.15;
+T_ref_ech = moteur(13) + 273.15;
+p_atm = moteur(14);
+COF = moteur(15);
+Dp_ech = moteur(16)/1000; % mbar - bar
+
+
+
 %% Point 2
 
-T(1) = Tref;
+T(1) = T_capot;
 p(1) = p_atm;
 p(2) = pi_comp * p(1);
 gamma = gamma_a(T(1)); 
@@ -57,7 +60,7 @@ T(2) = T(1) + (T2_is-T(1))/n_compresseur;
 
 %% Point 3
 
-T(3) = T(2) + COF*(Tref-T(2));
+T(3) = T(2) + COF*(T_ref_ech-T(2));
 p(3)=p(2)-Dp_ech;
 
 %% Point 3'
@@ -81,6 +84,8 @@ pHaut = csvread('input_variables\PV_haut.csv',1); V_haut = pHaut(:,1); p_haut = 
 
 T3p = T(3);
 p3p = p(3); % pas de perte de charge apres le soupape
+% [~,indice] = max(V_bas);
+% p3p = p_bas(indice);
 m3p = p3p*10^5*V_max/r3p/T3p;
 
 %% Point 4
@@ -88,7 +93,6 @@ m3p = p3p*10^5*V_max/r3p/T3p;
 % pv^n = cste
 
 n_comp = polytropique(p_bas,V_bas,p3p);
-saveVar(2) = n_comp;
 p(4) = p3p*taux_comp^n_comp;
 T(4) = p(4)*10^5*V_min/m3p/ra;
 V(4) = V_min;
@@ -112,11 +116,9 @@ V(5) = V(5) * V_min;
 T(5) = p(5)*10^5*V(5)/m3p/rp;
 %V52 = m3p*rp*T(5)/p(5)/10^5;
 DT_45 = abs(T(5)-T4pp)/T4pp*100;
-saveVar(3) = DT_45;
 
 %% 6
 n_det = polytropique(p_haut,V_haut,p(5));
-saveVar(4) = n_det;
 p(6) = p(5)*(V(5)/V_max)^n_det;
 T(6) = p(6)*10^5*V_max/m3p/rp;
 V(6) = m3p*rp*T(6)/p(6)/10^5;
@@ -159,7 +161,6 @@ while (DT > tol && i < 10000)
    i = i+1;
    DT = abs(T(7) - 2*Tmoy + T7p);
 end
-
 %% Boucle T3p
 
 f = (1/taux_comp)*(T(3)/T(7))*(p(7)/p3p);
@@ -183,7 +184,6 @@ while (DT > tol && j < 10^3)
     m3pn = p3p*10^5*V_max/r3p/T3p;
     f = p(7)*10^5*V_min/m3pn/rp/T(7);
 end
-saveVar(5) = f;
 
 %% 3' - 4
 Tn = zeros(1,8); pn = Tn; Vn = Tn;
@@ -230,7 +230,8 @@ Tmoy = 0.5*(T0+T4pn);
 Tmoy2 = 0.5*(T0+Tn(4));
 cv = (1-xv)*cv_f(Tmoy)+xv*cv_p(Tmoy);
 cv2 = f*cv_p(Tmoy2)+(1-f)*cv_a(Tmoy2);
-Qv = m4pn * cv *(T4pn-T0)-m3pn*cv2*(Tn(4)-T0); 
+Qv = m4pn * cv *(T4pn-T0)-m3pn*cv2*(Tn(4)-T0);
+
 
 %% isobare 4'-4''
 m4ppn = (1+F*xp)*m3pn;
@@ -278,16 +279,51 @@ end
 Tn(Tn==0)=T(Tn==0);
 pn(pn==0)=p(pn==0);
 Vn(Vn==0)=V(Vn==0);
+% *****
+p7p = p3p;
+DT = 100;
+tol = 1;               
+i = 0;
+gamma = gamma_p(Tn(7));
+T7pn = Tn(7)*(pn(7)/p7p)^((1-gamma)/gamma);
+
+while (DT > tol && i < 10000)
+   Tmoy = (Tn(7) + T7pn)/2;
+   gamma = gamma_p(Tmoy);
+   T7pn = T(7)*(pn(7)/p7p)^((1-gamma)/gamma);
+   i = i+1;
+   DT = abs(Tn(7) - 2*Tmoy + T7pn);
+end
+fn = (1/taux_comp)*(Tn(3)/Tn(7))*(p(7)/p3p);
+tol = 1; % 1K
+
+r3p = f*rp+(1-f)*ra; % Diesel
+T0 = 273.15;
+T3p_old = T3pn;
+
+DT = 100;
+j = 0;
+while (DT > tol && j < 10^3)
+    j=j+1;
+    T03 = (T0+T3pn)/2;
+    T07 = (T0+T7p)/2;
+    cp_03 = f*cp_p(T03)+(1-fn)*cp_a(T03);
+    T3pn = (f*cp_p(T07)*(T7pn-T0)+(1-fn)*cp_a(T03)*(Tn(3)-T0))/cp_03+T0;
+    DT = abs(T3pn-T3p_old);
+    T3p_old = T3pn;
+    m3pn = p3p*10^5*V_max/r3p/T3pn;
+    fn = p(7)*10^5*V_min/m3pn/rp/Tn(7);
+end
 
 %% 7 - 8
 tol_q = 15/100; %qwaste/qturb
 j = 0;
-qwaste = 1; qturb = 1;
+qwaste = 100; qturb = 50;
 pi_turbn = pi_turb;
 rapport_q_old = 0;
 
-while(qwaste/qturb > tol_q  && j < 10^5)
-    
+while(abs(qwaste)/qturb > tol_q  && j < 10^5)
+ 
     if (rapport_q_old > qwaste/qturb)
         pi_turbn = pi_turb*(1-0.1);
     else
@@ -301,7 +337,8 @@ tol = 1;                %DT = 1K
 i = 0;
 
 gamma = gamma_p(Tn(7));
-T8_is = Tn(7)*(pn(8)/p(7))^((gamma-1)/gamma); 
+T8_is = Tn(7)*(pn(8)/p(7))^((gamma-1)/gamma);
+
 
 while (DT > tol && i < 10000)
    i = i+1;
@@ -327,10 +364,7 @@ qwaste = qcomp+qcarb-qturb;
 j = j+1;
 
 end
-
-saveVar(6) = pi_turbn;
-Dq = abs(qwaste)/(qcomp+qcarb+qturb+qwaste)*100;
-saveVar(7) = Dq;
+Dq = abs(qwaste)/(qcomp+qcarb+qturb+abs(qwaste))*100;
 
 %% 7 - 8'
 p8p = p_atm;
@@ -341,64 +375,67 @@ qmoteur = qwaste + qturb;
 Tn(9) = qwaste/qmoteur*T8p + qturb/qmoteur*Tn(8);
 pn(9) = p_atm;
 
-%% Calcul des travaux
-r3p = (1-f)*ra+f*rp;
-W3p4 = m3pn*r3p/(n_comp-1)*(Tn(4)-T3pn);
-Wp = -max(p_haut)*10^5*(V4pp-V_min);
-
-mr = 0.5*(m4ppn*r4pp+m5n*rp);
-Wt = -mr*Tn(5)*log(Vn(5)/V4pp);
-
-W56 = m5n*rp/(n_det-1)*(Tn(6)-Tn(5));
-
-W_hp = W3p4+Wp+Wt+W56;
-W_bp = (pn(7)-p3p)*10^5*(V_max-V_min);
-W_th = W_hp + W_bp;
-
 %% Bilan thermique
 ma = m3p*(1-f);
 Qcalo = ma * F * PCI*1000;
 Qcomb = n_comb * Qcalo;
 Qapp = Qv+Qp+Qt;
+xvn = Qv/Qapp;
+xpn = (Qv+Qp)/Qapp;
+
+
+%% Calcul des travaux
+r3p = (1-f)*ra+f*rp;
+W3p4 = m3pn*r3p/(n_comp-1)*(Tn(4)-T3pn);
+W4p4pp = -max(p_haut)*10^5*(V4pp-V_min);
+
+mr = 0.5*(m4ppn*r4pp+m5n*rp);
+W4pp5 = -mr*Tn(5)*log(Vn(5)/V4pp);
+
+W56 = m5n*rp/(n_det-1)*(Tn(6)-Tn(5));
+
+W_hp = W3p4+W4p4pp+W4pp5+W56;
+W_bp = (pn(7)-p3p)*10^5*(V_max-V_min);
+W_th = W_hp + W_bp;
+
+
+Tmoy = 0.5*(T0+T4pn);
+Tmoy2 = 0.5*(T0+Tn(4));
+cv = (1-xvn)*cv_f(Tmoy)+xvn*cv_p(Tmoy);
+cv2 = f*cv_p(Tmoy2)+(1-f)*cv_a(Tmoy2);
+Qv = m4pn * cv *(T4pn-T0)-m3pn*cv2*(Tn(4)-T0);
+
+Tmoy = 0.5*(T4ppn+T0);
+Tmoy2 = 0.5*(T4pn+T0);
+cp = (1-xpn)*cp_f(Tmoy)+xpn*cp_p(Tmoy);
+cp2 = (1-xvn)*cp_f(Tmoy2)+xvn*cp_p(Tmoy);
+Qp = m4ppn * cp * (T4ppn-T0) - m4pn * cp2 * (T4pn-T0);
+
+
+Tmoy = 0.5*(T0+Tn(5));
+Tmoy2 = 0.5*(T0+T4ppn);
+cv = (1-xpn)*cv_f(Tmoy2)+xpn*cv_p(Tmoy2);
+Qt = m5n*cv_p(Tmoy)*(Tn(5)-T0)-m4ppn*cv*(T4ppn-T0)+0.5*(m4ppn*r4pp+m5n*r5)*Tn(5)*log(Vn(5)/V4pp);
+
+
 
 %% Calcul des chaleurs
 Tmoy = 0.5*(Tn(2)+Tn(3));
 m_air = qcomp / (N/120 * Ncyl);
 Q23 = m_air * cp_a(Tmoy) * (Tn(3)-Tn(2)); % < 0
-if (Q23 <0) 
-    saveVar(8) = 1; 
-else
-    saveVar(8) = 0; 
-end
 
 Tmoy = 0.5*(T3pn+Tn(4));
 cv = f*cv_p(Tmoy)+(1-f)*cv_a(Tmoy);
 gamma = f*gamma_p(Tmoy)+(1-f)*gamma_a(Tmoy);
 Q3p4 = m3pn*cv*(Tn(4)-T3pn)-W3p4; % si n_comp = 1.34 < gamma = 1.37, Q < 0
 
-if (n_comp < gamma && Q3p4 <0) 
-    saveVar(9) = 1; 
-elseif (n_comp > gamma && Q3p4 > 0) 
-    saveVar(9) = 1; 
-else
-    saveVar(9) = 0;
-end
-
 Tmoy = 0.5*(Tn(5)+Tn(6));
 cv = f*cv_p(Tmoy)+(1-f)*cv_a(Tmoy);
 gamma = f*gamma_p(Tmoy)+(1-f)*gamma_a(Tmoy);
 Q56 = m3pn*cv*(Tn(6)-Tn(5))-W56; % si n_det < gamma, Q > 0
 
-if (n_det < gamma && Q56 >0) 
-    saveVar(10) = 1; 
-elseif (n_det > gamma && Q56 < 0) 
-    saveVar(10) = 1; 
-else
-    saveVar(10) = 0;
-end
-
 Q_pertes_comb = Qcomb-Qcalo; % < 0
-Q_pertes_paroi = Qapp - Qcomb; % <0
+Q_pertes_paroi = Qappn - Qcomb; % <0
 
 Tmoy = 0.5*(Tn(7)+Tn(8));
 Wturb = qturb/(N/120*Ncyl) * cp_p(Tmoy) * (Tn(8)-Tn(7));
@@ -409,17 +446,16 @@ Tmoy2 = 0.5*(Tn(9)+T0);
 m_echap = qmoteur/(N/120*Ncyl);
 Q_echap = m_air * cp_a(Tmoy) * (Tn(1)-T0) - m_echap * cp_p(Tmoy2) * (Tn(9)-T0); % <0
 
-Pertes_moteur = Q_pertes_comb + Q_pertes_paroi + Q3p4 + Q56; % sans echap
-Pertes_turbo = Q23 + Q_frottements;
-
-indice = 1; %  1 -> total   2-> Pertes moteur   3-> Pertes turbo
+indice = 2;
 
 if (indice == 1)
-    X = [Pertes_moteur, Pertes_turbo, W_th, Q_echap];
-    labels = {'Pertes Moteur', 'Pertes Turbo', 'Travail Recup', 'Q echap'};
+    X = [Q_pertes_comb,Q_pertes_paroi,Q_frottements,Q_echap,Q23];
+    labels = {'Pertes Combustion', 'Pertes Paroi', 'Frottement', 'Q echap','Q23'};
+    
 elseif (indice ==2)
-    X = [Q_pertes_comb, Q_pertes_paroi, Q3p4, Q56, Q_echap];
-    labels = {'Q pertes comb', 'Q pertes paroi', 'Q3p4', 'Q56' ,'Q echap'};
+    X = [abs(Q_pertes_comb+Q_frottements+Q23), abs(Q_pertes_paroi), abs(Q_echap), abs(W_th)];
+    labels = {'Autres pertes', 'Pertes Paroi', 'Q echap', 'Travail Utile Cycle'};
+
 else 
     X = [Q23, Q_frottements];
     labels = {'Q23', 'Q frottements'};
@@ -428,14 +464,10 @@ end
 if (opt_plot_1)
     figure()
     pie(abs(X))
-    legend(labels,'Location','southeast')
-    title('Repartition de l energie degagee par la combustion')
+    legend(labels,'Location','bestoutside','Orientation','vertical')
+    title('Distribution energetique du systeme')
+
 end
-
-% discuter comment diminuer les pertes
-
-DQ = (Qcalo-abs(Pertes_moteur+Q_echap+Pertes_turbo+W_th))/Qcalo*100;
-saveVar(11) = DQ;
 
 %% Performances
 
@@ -447,7 +479,6 @@ CSI = qcarb/Pi;
 CSI_g = CSI*(1000*3600*1000);
 n_icycle = abs(W_th)/Qcalo;
 
-saveVar(12) = n_icycle;
 
 %% Temperature adiabatique de flamme 
 % prevoir les oxydes
@@ -509,7 +540,7 @@ while (DH > tol && i < 10^4)
 end
 
 DT_ver = abs(T5a-T5b);
-saveVar(13)=DT_ver;
+
 
 %% Plot
 if(opt_plot_2)
@@ -537,14 +568,37 @@ if(opt_plot_3)
 end
 
 
-%% Rapport des r?sultats
-namesVar = ["PCI";"n_comp";"DT_45";"n_det";"f";"pi_turbn";"Dq";"Q23=1";...
-    "Q3p4=1";"Q56=1";"DQ";"nicycle";"DT_ver"];
-T1 = table(namesVar,saveVar);
-T2 = table([pn';p3p;p4p;p4pp;p7p;p8p],[Tn';T3p;T4p;T4pp;T7p;T8p]);
-T1.Properties.VariableNames = {'Variable', 'Value'};
-T2.Properties.VariableNames = {'p_bar', 'T_K'};
-mkdir('output_variables')
+%% Rapport des resultats
+
+outVar = [PCI/1000; n_comp; n_det;f*100 ;fn*100;pi_turbn; qcomp*1000; qturb*1000; ...
+    abs(qwaste*1000);qcarb*1000; W3p4*4;W4p4pp*4 ;W4pp5*4;W56*4; W_hp*4;...
+    W_bp*4; W_th*4;Wturb*4;Q23*4;Q3p4*4;Qv*4;Qp*4;Qt*4;Q56*4;Q_frottements*4;...
+    Qcalo*4; Qcomb*4; Qapp*4; Q_pertes_comb*4;Q_pertes_paroi*4; Q_echap*4;...
+    PMI_hp/10^5; PMI_bp/10^5;...
+PMI/10^5;Pi/10^3;CSI_g;n_icycle*100;T5a;T5b];
+namesVar = ["PCI";"n_comp";"n_det";"f";"fn";"pi_det";"q_comp";"q_turb";"q_waste";...
+    "q_carb";"W_3p4'"; "W_4'4''";"W_4''5";"W_56"; "W_hp"; "W_bp";...
+    "W_cycle";"W_turbine";"Q_23";"Q_3'4";"Q_44'";"Q_4'4''";"Q_4''5";"Q_56";...
+    "Q_frottement";"Q_calo";"Q_comb" ; "Q_app"; "Q_pertes_combustion"; ...
+    "Q_pertes_paroi";"Q_echap";...
+    "PMI_hp";"PMI_bp";"PMI";"Pi";"CSI"; "n_cycle";"T_5_PCI";"T_5_energie"];
+uniVar = ["kJ/kg";"-";"-";"%";"%";"-";"g/s";"g/s";"g/s";...
+    "g/s";"J";"J";"J";"J";"J";"J";"J";"J";"J";"J";"J";"J";"J";"J";"J";"J";"J";"J";"J";"J";"J";"bar";...
+    "bar";"bar";"kW";"g/kW-h";"%";"K";"K"];
+
+T1 = table(namesVar,uniVar,outVar);
+
+T2_T = [Tn(1:3)';T3p;Tn(4);T4pn;T4ppn;Tn(5);Tn(6:7)';T7pn;Tn(8);T8p;Tn(9)];
+T2_p = [pn(1:3)';p3p;pn(4);p4p;p4pp;pn(5);pn(6:7)';p7p;pn(8);p8p;pn(9)];
+T2_names = [ "1 "; "2 "; "3"; "3' "; "4 "; "4' " ; "4'' "; "5 "; "6 "; "7";"7'";"8";"8'";"9"];
+T2 = table(T2_names,T2_T,T2_p);
+
+T1.Properties.VariableNames = {'Variable', 'Unite', 'Value'};
+T2.Properties.VariableNames = {'Point','T_K', 'p_bar'};
+
+output_folder = 'output_variables';
+if ~exist(output_folder, 'dir')
+    mkdir(output_folder)
+end
 write(T1,'output_variables/rapport.csv','Delimiter',',')
 write(T2,'output_variables/rapport_pT.csv','Delimiter',',')
-
