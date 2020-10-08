@@ -1,4 +1,4 @@
-**Ce répertoire contient 4 dossiers et 1 fichier .m:
+**Ce répertoire contient 4 dossiers et 1 fichier .m:**
 
 
 ## fichier "codes"
@@ -12,7 +12,7 @@ Ce dossier contient 5 sous-fonctions de la fonction principale. Sont-ils:
 
 ## fichier "info_moteurs"
 **Ce dossier contient deux autres dossiers (4a et 4b), qui contiennent les informations nécessaires pour chaque moteur. Choisissez l'un des moteurs, copiez tous les 
-fichiers .csv et collez-les dans le dossier "input_variables".
+fichiers .csv et collez-les dans le dossier "input_variables".**
 
 ## fichier "input_variables"
 Dossier vide qui recevra les valeurs du dossier "info_moteurs".
